@@ -16,6 +16,8 @@ export class Controls {
     this.vel = new THREE.Vector2();
     this.crouch = false;
     this.locked = false;
+    this.noLock = false;
+    this.skipMoves = 0;
     this.dragging = false;
     this.bob = 0;
     this.sensitivity = 0.0022;
@@ -32,7 +34,7 @@ export class Controls {
   }
 
   lockPointer() {
-    if (this.isTouch || !this.canvas.requestPointerLock) return;
+    if (this.isTouch || this.noLock || !this.canvas.requestPointerLock) return;
     try { const p = this.canvas.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch { /* unsupported */ }
   }
 
@@ -72,12 +74,16 @@ export class Controls {
 
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === this.canvas;
+      this.skipMoves = 4; // browsers can emit a huge bogus delta right as the lock engages
       if (!this.locked && this.enabled && this.cb.onUnlock) this.cb.onUnlock();
     });
     document.addEventListener('mousemove', (e) => {
       if (!this.enabled || this.isTouch) return;
-      if (this.locked) this._rotate(e.movementX, e.movementY, this.sensitivity);
-      else if (this.dragging) this._rotate(e.movementX, e.movementY, this.sensitivity * 1.2);
+      if (this.locked) {
+        if (this.skipMoves > 0) { this.skipMoves--; return; }
+        if (Math.abs(e.movementX) > 220 || Math.abs(e.movementY) > 220) return;
+        this._rotate(e.movementX, e.movementY, this.sensitivity);
+      } else if (this.dragging) this._rotate(e.movementX, e.movementY, this.sensitivity * 1.2);
     });
     this.canvas.addEventListener('mousedown', (e) => {
       if (!this.enabled || this.isTouch || e.button !== 0) return;

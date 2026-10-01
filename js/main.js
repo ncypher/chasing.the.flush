@@ -14,9 +14,9 @@ const $ = (id) => document.getElementById(id);
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
 const PRESETS = {
-  high: { pixelRatioCap: 2, shadowSize: 2048, terrainSegs: 230, treeDensity: 1, ferns: 800, flowers: 360, grass: 2600, leaves: 14000, motes: 420, bloom: true, msaa: 0, aa: 'smaa', hiSegs: 84, hiRings: 120 },
-  medium: { pixelRatioCap: 1.5, shadowSize: 2048, terrainSegs: 190, treeDensity: 0.85, ferns: 500, flowers: 260, grass: 1600, leaves: 9000, motes: 300, bloom: true, msaa: 0, aa: 'smaa', hiSegs: 64, hiRings: 100 },
-  low: { pixelRatioCap: 1.25, shadowSize: 1024, terrainSegs: 140, treeDensity: 0.6, ferns: 260, flowers: 160, grass: 900, leaves: 4500, motes: 160, bloom: false, msaa: 0, aa: 'fxaa', hiSegs: 48, hiRings: 80 },
+  high: { pixelRatioCap: 2, shadowSize: 2048, terrainSegs: 230, treeDensity: 1, ferns: 800, flowers: 360, grass: 5200, leaves: 14000, motes: 420, bloom: true, msaa: 0, aa: 'smaa', hiSegs: 84, hiRings: 120 },
+  medium: { pixelRatioCap: 1.5, shadowSize: 2048, terrainSegs: 190, treeDensity: 0.85, ferns: 500, flowers: 260, grass: 3200, leaves: 9000, motes: 300, bloom: true, msaa: 0, aa: 'smaa', hiSegs: 64, hiRings: 100 },
+  low: { pixelRatioCap: 1.25, shadowSize: 1024, terrainSegs: 140, treeDensity: 0.6, ferns: 260, flowers: 160, grass: 1800, leaves: 4500, motes: 160, bloom: false, msaa: 0, aa: 'fxaa', hiSegs: 48, hiRings: 80 },
 };
 
 function fatal(err) {
@@ -95,6 +95,7 @@ async function boot() {
     canvas, camera, env, isTouch: touch,
     callbacks: { onKey: (e) => onKey(e), onUnlock: () => onPointerUnlock() },
   });
+  controls.noLock = qs('nolock') === '1'; // test/automation switch; players always get pointer lock
 
   // ---------- sizing ----------
   function resize() {
@@ -272,6 +273,7 @@ async function boot() {
 
   // ---------- main loop ----------
   let currentTarget = null;
+  let endShown = false;
   let last = performance.now();
   let time = 0;
   const frameTimes = [];
@@ -290,6 +292,10 @@ async function boot() {
     const canMove = game.phase === 'playing' && !paused && !game.inspecting && !ui.overlayOpen;
     if (controls.enabled !== canMove && !game.inspecting) controls.setEnabled(canMove);
     controls.speedMul = game.sickLevel > 0 ? 0.65 : 1;
+    if (game.phase === 'ended') {
+      if (!endShown) { endShown = true; controls.teleport(env.start.x, env.start.z, 0.62); controls.pitch = -0.05; controls.crouch = false; }
+      controls.yaw += dt * 0.03;
+    }
     controls.update(dt);
     env.update(dt, time, camera, controls.groundY);
     game.paused = paused || ui.overlayOpen;
@@ -370,6 +376,7 @@ async function boot() {
   setTimeout(() => loading.classList.add('hidden'), 700);
   ui.showHUD(true);
   await game.start();
+  ui.toast(touch ? 'Walk the woods. Tap Inspect when a mushroom is in the ring.' : 'Walk the woods. When a mushroom is in the ring, press E to inspect it.', 'note');
   if (!touch && !qs('autostart')) controls.lockPointer();
 }
 

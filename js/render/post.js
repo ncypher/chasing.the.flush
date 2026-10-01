@@ -5,7 +5,32 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
-import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
+
+// Tiny FXAA (Lottes-style) for low-power devices: one cheap pass, no D3D sampler-bias warnings.
+const FxaaLite = {
+  uniforms: { tDiffuse: { value: null }, resolution: { value: new THREE.Vector2(1 / 1024, 1 / 512) } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform vec2 resolution; varying vec2 vUv;
+    vec3 tex(vec2 p){ return texture2D(tDiffuse, p).rgb; }
+    void main(){
+      vec3 L = vec3(0.299, 0.587, 0.114);
+      vec3 nw = tex(vUv + vec2(-1.0, -1.0) * resolution), ne = tex(vUv + vec2(1.0, -1.0) * resolution);
+      vec3 sw = tex(vUv + vec2(-1.0, 1.0) * resolution), se = tex(vUv + vec2(1.0, 1.0) * resolution);
+      vec3 m = tex(vUv);
+      float lnw = dot(nw, L), lne = dot(ne, L), lsw = dot(sw, L), lse = dot(se, L), lm = dot(m, L);
+      float lmin = min(lm, min(min(lnw, lne), min(lsw, lse)));
+      float lmax = max(lm, max(max(lnw, lne), max(lsw, lse)));
+      vec2 dir = vec2(-((lnw + lne) - (lsw + lse)), (lnw + lsw) - (lne + lse));
+      float reduce = max((lnw + lne + lsw + lse) * 0.03125, 1.0 / 128.0);
+      float rcp = 1.0 / (min(abs(dir.x), abs(dir.y)) + reduce);
+      dir = clamp(dir * rcp, vec2(-8.0), vec2(8.0)) * resolution;
+      vec3 a = 0.5 * (tex(vUv + dir * (1.0 / 3.0 - 0.5)) + tex(vUv + dir * (2.0 / 3.0 - 0.5)));
+      vec3 b = a * 0.5 + 0.25 * (tex(vUv + dir * -0.5) + tex(vUv + dir * 0.5));
+      float lb = dot(b, L);
+      gl_FragColor = vec4((lb < lmin || lb > lmax) ? a : b, 1.0);
+    }`,
+};
 
 // Subtle grade: cool-green shadows, warm highlights, mild saturation, vignette, light grain,
 // plus the "poisoned" wobble/green wash driven by uSick.
@@ -54,6 +79,6 @@ export function createComposer(renderer, scene, camera, quality) {
   composer.addPass(new OutputPass());
   let fxaa = null;
   if (quality.aa === 'smaa') composer.addPass(new SMAAPass(4, 4));
-  else if (quality.aa === 'fxaa') { fxaa = new ShaderPass(FXAAShader); composer.addPass(fxaa); }
+  else if (quality.aa === 'fxaa') { fxaa = new ShaderPass(FxaaLite); composer.addPass(fxaa); }
   return { composer, bloom, grade, fxaa };
 }
