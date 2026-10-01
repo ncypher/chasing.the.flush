@@ -1,0 +1,71 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mushroom gallery (dev)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>html,body{margin:0;height:100%;background:#1b2216;overflow:hidden}canvas{display:block}</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<script type="module">
+import * as THREE from 'three';
+import { RNG } from '../js/core/rng.js';
+import { MushroomLibrary } from '../js/mushrooms/index.js';
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x2a3320);
+const camera = new THREE.PerspectiveCamera(32, innerWidth / innerHeight, 0.1, 100);
+scene.add(new THREE.HemisphereLight(0xdde8ff, 0x3a3020, 1.2));
+const sun = new THREE.DirectionalLight(0xfff0d0, 3);
+sun.position.set(2, 4, 3);
+scene.add(sun);
+
+const lib = new MushroomLibrary(new RNG(+(new URLSearchParams(location.search).get('seed') || 7)));
+const t0 = performance.now();
+while (lib.buildNext());
+window.buildMs = performance.now() - t0;
+
+const mode = new URLSearchParams(location.search).get('mode') || 'whole';
+const rngI = new RNG(3);
+let x = 0;
+if (mode === 'whole') {
+  const ids = ['morel', 'gyromitra'];
+  ids.forEach((id, row) => {
+    lib.variants[id].forEach((v, i) => {
+      const m = new THREE.Mesh(v.hi, lib.mats[v.spec.kind]);
+      m.position.set(i * 1.1 - 4, row * -1.4, 0);
+      m.rotation.y = i;
+      scene.add(m);
+    });
+  });
+  camera.position.set(0, -0.2, 11);
+  camera.lookAt(0, -0.4, 0);
+} else {
+  const m = lib.variants.morel[+(new URLSearchParams(location.search).get('i') || 0)];
+  const f = lib.variants.gyromitra[+(new URLSearchParams(location.search).get('j') || 0)];
+  [[m, -2.3], [f, 2.3]].forEach(([v, ox]) => {
+    const h = lib.getHalves(v);
+    h.a.rotation.y = Math.PI; h.a.position.set(ox - 0.55, 0, 0);
+    h.b.position.set(ox + 0.55, 0, 0);
+    scene.add(h.a, h.b);
+  });
+  camera.position.set(0, 0.7, 7.5);
+  camera.lookAt(0, 0.5, 0);
+}
+renderer.render(scene, camera);
+window.done = true;
+</script>
+</body>
+</html>
+

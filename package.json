@@ -1,0 +1,14 @@
+{
+  "name": "chasing-the-flush",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Chasing the Flush - a 3D mushroom-foraging game (v1: spring morel season).",
+  "scripts": {
+    "serve": "node tools/serve.mjs",
+    "verify": "node tools/verify.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "1.49.1",
+    "pngjs": "^7.0.0"
+  }
+}
