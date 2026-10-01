@@ -8,7 +8,6 @@
     "verify": "node tools/verify.mjs"
   },
   "devDependencies": {
-    "playwright-core": "1.49.1",
-    "pngjs": "^7.0.0"
+    "playwright-core": "1.49.1"
   }
 }

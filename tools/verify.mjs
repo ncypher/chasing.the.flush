@@ -1,4 +1,4 @@
-// End-to-end verification in a real browser (Edge via Playwright). Run: node tools/verify.mjs
+﻿// End-to-end verification in a real browser (Edge via Playwright). Run: node tools/verify.mjs
 // Starts the dev server itself if nothing is listening, plays a full 10-day season through the real UI,
 // measures fps, checks console cleanliness (desktop + mobile viewport) and writes README screenshots.
 import { chromium } from 'playwright-core';
@@ -10,9 +10,11 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BASE = process.env.BASE_URL || 'http://127.0.0.1:8080/';
 const SEED = process.env.SEED || '1234';
-const SHOTS = path.join(root, 'docs', 'screenshots');
+const SHOTS = process.env.SHOTS_DIR ? path.resolve(process.env.SHOTS_DIR) : path.join(root, 'docs', 'screenshots');
 fs.mkdirSync(SHOTS, { recursive: true });
 const report = { base: BASE, seed: SEED, checks: {} };
+fs.mkdirSync(path.join(root, 'scratch'), { recursive: true });
+const snap = (page, name) => page.screenshot({ path: path.join(SHOTS, name.replace(/\.png$/, '.jpg')), type: 'jpeg', quality: 88, scale: 'css' });
 const log = (...a) => console.log(...a);
 
 let server = null;
@@ -25,7 +27,7 @@ async function ensureServer() {
 
 async function launch(ctxOpts) {
   const browser = await chromium.launch({
-    channel: 'msedge', headless: false,
+    channel: process.env.BROWSER_CHANNEL || 'msedge', headless: false,
     args: ['--use-angle=d3d11', '--ignore-gpu-blocklist', '--enable-gpu-rasterization', '--disable-renderer-backgrounding', '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows'],
   });
   const ctx = await browser.newContext({ deviceScaleFactor: 1, ...ctxOpts });
@@ -42,10 +44,22 @@ async function bootGame(page, extra = '') {
   await page.waitForFunction("window.ctf && window.ctf.game.phase==='dayintro'", null, { timeout: 120000 });
 }
 
+// the real path a player takes: title screen -> Start -> loading -> day intro
+async function bootViaTitle(page) {
+  await page.goto(`${BASE}index.html?seed=${SEED}&nolock=1`, { waitUntil: 'load' });
+  await page.waitForSelector('#start-btn', { timeout: 120000 });
+  await page.waitForTimeout(400);
+  await snap(page, '00-title.png');
+  const t0 = Date.now();
+  await page.click('#start-btn');
+  await page.waitForFunction("window.ctf && window.ctf.game.phase==='dayintro'", null, { timeout: 120000 });
+  report.loadSeconds = (Date.now() - t0) / 1000;
+}
+
 // ------------------------------------------------------------------ desktop
 async function desktop() {
   const { browser, page, logs } = await launch({ viewport: { width: 1600, height: 900 } });
-  await bootGame(page);
+  await bootViaTitle(page);
   const gpu = await page.evaluate(() => {
     const gl = ctf.renderer.getContext();
     const ext = gl.getExtension('WEBGL_debug_renderer_info');
@@ -53,14 +67,22 @@ async function desktop() {
   });
   report.gpu = gpu;
   report.stats = await page.evaluate(() => ({ ...ctf.env.stats, quality: ctf.quality.name }));
+  report.habitat = await page.evaluate(() => {
+    // where do true vs false morels CAN fruit? share of fruiting sites at host trees vs open ground
+    const share = (id) => { const s = ctf.game.sites[id]; const by = {}; for (const x of s) by[x.host] = (by[x.host] || 0) + 1; return { total: s.length, by }; };
+    return { morel: share('morel'), gyromitra: share('gyromitra') };
+  });
 
   // --- intro card then the opening view
-  await page.screenshot({ path: path.join(SHOTS, '00-day-intro.png') });
+  await snap(page, '00-day-intro.png');
   await page.click('#go-btn');
   await page.waitForFunction("ctf.game.phase==='playing'");
+  await page.waitForTimeout(700);
   await page.evaluate(() => { ctf.controls.yaw = 0.62; ctf.controls.pitch = -0.04; });
-  await page.waitForTimeout(1800);
-  await page.screenshot({ path: path.join(SHOTS, '01-opening-view.png') });
+  await page.waitForTimeout(1500);
+  await page.evaluate(() => { ctf.controls.yaw = 0.62; ctf.controls.pitch = -0.04; });
+  await page.waitForTimeout(300);
+  await snap(page, '01-opening-view.png');
 
   // --- fps while walking forward and turning (default settings)
   await page.keyboard.down('KeyW');
@@ -103,7 +125,7 @@ async function desktop() {
     await press('KeyC');
     await page.waitForFunction("ctf.inspect.state==='cut'", null, { timeout: 8000 });
     await page.waitForTimeout(700);
-    if (shotName) await page.screenshot({ path: path.join(SHOTS, shotName) });
+    if (shotName) await snap(page, shotName);
     await press('Enter');
     await page.waitForFunction('!ctf.inspect.active', null, { timeout: 5000 });
   };
@@ -113,7 +135,17 @@ async function desktop() {
     await page.click('#next-btn');
     for (let k = 0; k < 6; k++) {
       await page.waitForFunction("document.getElementById('go-btn') || document.getElementById('again-btn') || (document.getElementById('next-btn') && /bed/.test(document.querySelector('#overlay h2')?.textContent||''))");
-      if (await page.$('#next-btn')) { report.sickCardSeen = true; await page.click('#next-btn'); continue; }
+      if (await page.$('#next-btn')) {
+        report.sickCardSeen = true;
+        report.sickDay = await page.evaluate(() => {
+          const i = ctf.game.dayIdx + 1, w = ctf.game.season.weather[i], p = ctf.game.stats.perDay[i];
+          return {
+            day: i + 1, soil: w.soil, rain: w.rain, sky: w.sky, appearedTrue: p.appeared.true, appearedFalse: p.appeared.false,
+            activeTrue: ctf.game.active.filter((m) => m.kind === 'true').length, activeFalse: ctf.game.active.filter((m) => m.kind === 'false').length,
+          };
+        });
+        await page.click('#next-btn'); continue;
+      }
       break;
     }
     if (await page.$('#go-btn')) { await page.click('#go-btn'); await page.waitForFunction("ctf.game.phase==='playing'"); await page.waitForTimeout(2000); }
@@ -126,13 +158,20 @@ async function desktop() {
     const d = s.d;
     flush.push({ day: d + 1, soil: s.w.soil, rain: s.w.rain, sky: s.w.sky, appearedTrue: s.appeared.true, appearedFalse: s.appeared.false, activeTrue: s.activeTrue, activeFalse: s.activeFalse });
     daySeq.push(d);
+    if (s.activeTrue >= 20 && !report.fruitedByHost) {
+      report.fruitedByHost = await page.evaluate(() => {
+        const by = { true: {}, false: {} };
+        for (const m of ctf.game.active) by[m.kind][m.site.host] = (by[m.kind][m.site.host] || 0) + 1;
+        return by;
+      });
+    }
     log(`day ${d + 1}: soil ${s.w.soil} rain ${s.w.rain} ${s.w.sky} | new true ${s.appeared.true} false ${s.appeared.false} | on the ground true ${s.activeTrue} false ${s.activeFalse}`);
 
     // screenshot the same spot on an early and a peak day (flush visibly changes)
     if (step === 0 || s.activeTrue > 40 && !report.peakShot) {
       await page.evaluate(() => { const g = ctf.game; const m = g.active.find((x) => x.kind === 'true') || g.active[0]; if (m) { ctf.controls.teleport(m.pos.x + 3.2, m.pos.z + 2.4, 0); ctf.controls.lookAt(m.pos.x, m.pos.y, m.pos.z); } });
       await page.waitForTimeout(1500);
-      await page.screenshot({ path: path.join(SHOTS, step === 0 ? 'flush-day1.png' : 'flush-peak.png') });
+      await snap(page, step === 0 ? 'flush-day1.png' : 'flush-peak.png');
       if (step !== 0) report.peakShot = true;
     }
 
@@ -144,11 +183,11 @@ async function desktop() {
       if (!report.truePick) {
         // first true morel: inspect, screenshot, cut it open to learn the tell
         if (await startInspect('true', 0)) {
-          await page.screenshot({ path: path.join(SHOTS, '02-inspect-true-morel.png') });
+          await snap(page, '02-inspect-true-morel.png');
           await doCut('03-cut-open-true-morel.png'); tally.trueCut++;
         }
         if (await startInspect('false', 0)) {
-          await page.screenshot({ path: path.join(SHOTS, '04-inspect-false-morel.png') });
+          await snap(page, '04-inspect-false-morel.png');
           await doCut('05-cut-open-false-morel.png'); tally.falseCut++;
         }
         report.truePick = true;
@@ -165,12 +204,12 @@ async function desktop() {
       if (d === 6 && !tally.falsePicked) {
         // the mistake: pick a lookalike -> sick, tomorrow is lost
         if (await startInspect('false', 1)) {
-          await page.screenshot({ path: path.join(SHOTS, '06-inspect-before-mistake.png') });
+          await snap(page, '06-inspect-before-mistake.png');
           await doPick(); tally.falsePicked++;
           const after = await page.evaluate(() => ({ sick: ctf.game.sickToday, skip: ctf.game.skipNext, lvl: ctf.game.sickLevel, vis: !document.getElementById('vignette-sick').classList.contains('hidden') }));
           report.checks.sickAfterFalsePick = after;
           await page.waitForTimeout(800);
-          await page.screenshot({ path: path.join(SHOTS, '07-sick.png') });
+          await snap(page, '07-sick.png');
         }
       }
       if (d === 8) { if (await startInspect('false', 0)) { await doLeave(); tally.falseLeft++; } }
@@ -178,7 +217,7 @@ async function desktop() {
     tally.perDayTrue.push(mine);
     if (step === 4) { // notebook screenshot mid-season
       await press('KeyN'); await page.waitForTimeout(500);
-      await page.screenshot({ path: path.join(SHOTS, '08-notebook.png') });
+      await snap(page, '08-notebook.png');
       await press('KeyN'); await page.waitForTimeout(300);
     }
     await advance();
@@ -187,7 +226,7 @@ async function desktop() {
   // --- summary screen vs ground truth
   await page.waitForSelector('#end-stats');
   await page.waitForTimeout(500);
-  await page.screenshot({ path: path.join(SHOTS, '09-end-summary.png') });
+  await snap(page, '09-end-summary.png');
   const shown = await page.evaluate(() => ({
     true: document.getElementById('s-true').textContent, avoid: document.getElementById('s-avoid').textContent, mist: document.getElementById('s-mist').textContent,
     best: document.getElementById('s-best').textContent, missed: document.getElementById('s-missed').textContent, sick: document.getElementById('s-sick').textContent,
@@ -201,7 +240,7 @@ async function desktop() {
   };
   report.summary = { shown, expected, daysPlayed: daySeq.map((d) => d + 1), flush };
   report.checks.summaryAccurate = shown.true == expected.true && shown.avoid == expected.avoid && shown.mist == expected.mist && shown.missed == expected.missed && shown.sick == expected.sick && shown.rows === 10;
-  report.checks.bestDayMatches = shown.best.includes(`: ${bestTrue}`) || bestTrue === 0;
+  report.checks.bestDayMatches = shown.best == String(bestTrue) || bestTrue === 0;
   report.checks.sickDayLost = report.sickCardSeen === true && daySeq.length === 9;
   const t = flush.map((f) => f.appearedTrue);
   report.checks.flushVaries = Math.max(...t) > 3 * (Math.min(...t) + 1) && t[0] === 0 && t[t.length - 1] < Math.max(...t) / 2;
@@ -218,7 +257,7 @@ async function mobile() {
   const { browser, ctx, page, logs } = await launch({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, hasTouch: true, isMobile: true });
   await bootGame(page);
   report.mobile = await page.evaluate(() => ({ touchClass: document.body.classList.contains('touch'), quality: ctf.quality.name, dpr: window.devicePixelRatio, pixelRatio: ctf.perf.pixelRatio, canvas: [ctf.renderer.domElement.width, ctf.renderer.domElement.height] }));
-  await page.screenshot({ path: path.join(SHOTS, 'mobile-00-intro.png') });
+  await snap(page, 'mobile-00-intro.png');
   await page.tap('#go-btn');
   await page.waitForFunction("ctf.game.phase==='playing'");
   await page.waitForTimeout(1500);
@@ -237,23 +276,27 @@ async function mobile() {
   report.mobile.moved = Math.hypot(pos1.x - pos0.x, pos1.z - pos0.z);
   report.mobile.lookDelta = pos2.yaw - pos1.yaw;
   report.mobile.fps = await page.evaluate(() => ctf.measureFps(5));
-  await page.screenshot({ path: path.join(SHOTS, 'mobile-01-playing.png') });
+  await snap(page, 'mobile-01-playing.png');
   // inspect via the on-screen button
   await page.evaluate(() => { const g = ctf.game; for (let d = 1; d < 5; d++) g.spawnDay(d); });
   await page.evaluate(() => ctf.goTo(ctf.game.active.some((m) => m.kind === 'true') ? 'true' : 'false', 0));
-  await page.waitForTimeout(400);
-  const btnVisible = await page.evaluate(() => !document.getElementById('touch-inspect').classList.contains('hidden'));
+  const btnVisible = await page.waitForFunction("!document.getElementById('touch-inspect').classList.contains('hidden')", null, { timeout: 8000 }).then(() => true, () => false);
   if (btnVisible) {
     await page.tap('#touch-inspect');
     await page.waitForFunction('ctf.inspect.active', null, { timeout: 5000 });
     await page.waitForTimeout(600);
-    await page.screenshot({ path: path.join(SHOTS, 'mobile-02-inspect.png') });
+    await snap(page, 'mobile-02-inspect.png');
     await page.tap('#act-cut');
     await page.waitForFunction("ctf.inspect.state==='cut'", null, { timeout: 8000 });
     await page.waitForTimeout(600);
-    await page.screenshot({ path: path.join(SHOTS, 'mobile-03-cut.png') });
+    await snap(page, 'mobile-03-cut.png');
   }
   report.mobile.inspectButton = btnVisible;
+  if (btnVisible) await page.tap('#act-done');
+  await page.waitForFunction('!ctf.inspect.active');
+  await page.evaluate(() => { ctf.game.dayLen = ctf.game.dayTime + 1.5; });
+  await page.waitForSelector('#next-btn', { timeout: 10000 });
+  report.checks.dayEndsAtDusk = /Dusk/.test(await page.textContent('#overlay h2'));
   report.mobileLogs = logs;
   log('mobile', JSON.stringify(report.mobile), 'logs:', logs.length ? logs.join('\n') : 'none');
   await browser.close();
@@ -262,7 +305,8 @@ async function mobile() {
 await ensureServer();
 await desktop();
 await mobile();
-fs.writeFileSync(path.join(root, 'scratch', 'verify-report.json'), JSON.stringify(report, null, 2));
+fs.writeFileSync(path.join(root, 'scratch', process.env.REPORT_NAME || 'verify-report.json'), JSON.stringify(report, null, 2));
 log('REPORT', JSON.stringify({ checks: report.checks, fps: report.fps, gpu: report.gpu }, null, 1));
 if (server) server.kill();
 process.exit(0);
+
