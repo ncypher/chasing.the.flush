@@ -1,0 +1,9 @@
+*.code-workspace
+.vscode/
+node_modules/
+Thumbs.db
+.DS_Store
+scratch/
+tmp/
+out/
+output/
