@@ -87,9 +87,9 @@ export class UI {
   setSick(on) { $('vignette-sick').classList.toggle('hidden', !on); }
 
   // ---------- overlays ----------
-  _card(html, { clear = false } = {}) {
+  _card(html, { clear = false, title = false } = {}) {
     this.on.overlayOpen?.();
-    this.overlay.className = clear ? 'clear' : '';
+    this.overlay.className = title ? 'title' : clear ? 'clear' : '';
     this.overlay.innerHTML = `<div class="card">${html}</div>`;
     this.overlay.classList.remove('hidden');
     return this.overlay.firstChild;
@@ -101,13 +101,14 @@ export class UI {
   showTitle(seed) {
     return new Promise((resolve) => {
       const el = this._card(`
+        <svg viewBox="0 0 64 64" width="54" height="54" aria-hidden="true" style="float:right;margin:0 0 8px 12px"><rect x="26" y="34" width="12" height="24" rx="4" fill="#efe6cf"/><path d="M32 5C47 8 51 28 47 40 40 43 24 43 17 40 13 28 17 8 32 5Z" fill="#d2ab4e"/><g fill="#5a3d14"><circle cx="28" cy="18" r="3"/><circle cx="37" cy="22" r="3"/><circle cx="26" cy="29" r="3"/><circle cx="35" cy="33" r="3"/><circle cx="42" cy="31" r="2.4"/><circle cx="32" cy="11" r="2.2"/></g></svg>
         <h1>Chasing the Flush</h1>
         <p class="sub">A morel-hunting game &middot; Spring &middot; Michigan hardwoods</p>
         <p>The spring flush lasts about ten days. Soil warms, rain comes, and the morels pop up under dying elm, ash, old apple trees and tulip poplar &mdash; right beside the <b>false morels</b> that can make you sick.</p>
         <h3>How to play</h3>
         <p>Walk the woods and spot mushrooms. <b>Inspect</b> one up close, turn it over, even <b>cut it in half</b> (that costs you the mushroom). Then pick it or leave it. A false morel in the basket ruins your next day. Watch the soil temperature and rain: they decide how many morels fruit each day.</p>
         <p class="sub">${this.isTouch ? 'Left thumb: move &middot; right thumb: look &middot; tap Inspect near a mushroom.' : 'WASD move &middot; mouse look (click to capture) &middot; Shift sprint &middot; C crouch &middot; E inspect &middot; N notebook &middot; H head home &middot; Esc menu.'}</p>
-        <div class="actions"><span class="sub" style="align-self:center">Seed</span><input id="seed-in" type="text" inputmode="numeric" value="${esc(seed)}" aria-label="Seed"><button class="btn primary" id="start-btn" type="button">Start the season</button></div>`);
+        <div class="actions"><span class="sub" style="align-self:center">Seed</span><input id="seed-in" type="text" inputmode="numeric" value="${esc(seed)}" aria-label="Seed"><button class="btn primary" id="start-btn" type="button">Start the season</button></div>`, { title: true });
       const go = () => {
         const v = $('seed-in').value.trim();
         const n = /^\d+$/.test(v) ? Number(v) >>> 0 : Array.from(v).reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
@@ -172,6 +173,8 @@ export class UI {
   }
 
   showSummary(s) {
+    this.showHUD(false);
+    document.body.classList.remove('inspecting');
     let best = 0;
     try { best = Number(localStorage.getItem('ctf-best') || 0); } catch { /* storage unavailable */ }
     const isBest = s.score > best;
@@ -186,7 +189,7 @@ export class UI {
         <div class="stat good"><b id="s-true">${s.trueGathered}</b><span>True morels gathered</span></div>
         <div class="stat"><b id="s-avoid">${s.avoided}</b><span>Lookalikes avoided</span></div>
         <div class="stat ${s.mistakes ? 'bad' : ''}"><b id="s-mist">${s.mistakes}</b><span>Mistakes (false morels picked)</span></div>
-        <div class="stat"><b id="s-best">${s.bestDay.count ? `${s.bestDayDate}: ${s.bestDay.count}` : '-'}</b><span>Best day</span></div>
+        <div class="stat"><b id="s-best">${s.bestDay.count || '-'}</b><span>Best day${s.bestDay.count ? ` (${s.bestDayDate})` : ''}</span></div>
         <div class="stat"><b id="s-missed">${s.missedTrue + s.trueCut}</b><span>True morels left or cut open</span></div>
         <div class="stat ${s.sickDays ? 'bad' : ''}"><b id="s-sick">${s.sickDays}</b><span>Sick days lost</span></div>
       </div>

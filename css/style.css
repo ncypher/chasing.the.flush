@@ -77,7 +77,11 @@ body.inspecting #toasts { top: auto; bottom: 88px; }
 
 #overlay { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: rgba(6, 12, 6, 0.58); padding: 12px; touch-action: pan-y; }
 #overlay.clear { background: rgba(6, 12, 6, 0.28); }
-.card { width: min(94vw, 640px); max-height: 92vh; overflow: auto; background: linear-gradient(#18281a, #101a10); border: 1px solid var(--line); border-radius: 16px; padding: 22px 26px; box-shadow: 0 20px 60px rgba(0,0,0,.55); user-select: text; -webkit-user-select: text; touch-action: pan-y; }
+#overlay.title { background: radial-gradient(ellipse at 50% 18%, rgba(150,170,70,.30), transparent 62%), linear-gradient(#0a130a, #15251a 55%, #0a120a); overflow: hidden; }
+#overlay.title::before { content: ''; position: absolute; inset: -20% -10%; pointer-events: none; filter: blur(14px);
+  background: linear-gradient(104deg, transparent 12%, rgba(255,236,170,.10) 16%, transparent 24%, transparent 38%, rgba(255,236,170,.07) 42%, transparent 50%, transparent 66%, rgba(255,236,170,.09) 70%, transparent 78%); }
+#overlay.title .card { position: relative; background: rgba(14, 24, 15, .78); backdrop-filter: blur(4px); }
+.card { width: min(94vw, 640px); max-height: 92vh; overflow: auto; scrollbar-width: thin; scrollbar-color: #53663f #101a10; background: linear-gradient(#18281a, #101a10); border: 1px solid var(--line); border-radius: 16px; padding: 22px 26px; box-shadow: 0 20px 60px rgba(0,0,0,.55); user-select: text; -webkit-user-select: text; touch-action: pan-y; }
 .card h1 { font: 34px var(--serif); margin: 0 0 4px; letter-spacing: .5px; }
 .card h2 { font: 24px var(--serif); margin: 0 0 8px; }
 .card h3 { font: 15px var(--sans); text-transform: uppercase; letter-spacing: 1.5px; color: var(--accent); margin: 18px 0 8px; }
@@ -95,7 +99,7 @@ body.inspecting #toasts { top: auto; bottom: 88px; }
 table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 table.tbl th, table.tbl td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
 table.tbl th { color: var(--ink-dim); font-weight: 600; }
-table.tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
+table.tbl td.num, table.tbl th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .unknown { color: #7d8a68; font-style: italic; }
 .tabs { display: flex; gap: 6px; margin: 10px 0 4px; flex-wrap: wrap; }
 .tab { font: 600 13px var(--sans); padding: 7px 14px; border-radius: 999px; background: rgba(255,255,255,.06); border: 1px solid var(--line); color: var(--ink-dim); cursor: pointer; }
