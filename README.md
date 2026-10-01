@@ -153,6 +153,19 @@ npm run verify         # end-to-end run in a real browser (Microsoft Edge by def
 
 The game itself needs no install: any static file server works, and it is deployed straight from the `main` branch root on GitHub Pages. `npm run verify` plays a full ten-day season through the real UI (title screen, inspecting, cutting, picking, a deliberate false-morel mistake, the lost day, the dusk timer and the summary), compares the summary screen with its own tally, checks the console on desktop and a phone-sized touch viewport, measures the frame rate, and rewrites `docs/screenshots`. Set `BASE_URL` to check a deployed copy, and `BROWSER_CHANNEL` (for example `chrome`) to use another browser. `tools/gallery.html` renders every mushroom variant side by side for debugging.
 
+## Deploying
+
+GitHub is the source of truth. The game is published to two places from the same files:
+
+| Target | URL | How it updates |
+|---|---|---|
+| GitHub Pages | https://ncypher.github.io/chasing.the.flush/ | Automatic: pushing to `main` publishes the repo root |
+| Hugging Face Space (static mirror) | https://huggingface.co/spaces/Strange-Loop/chasing.the.flush, direct play at https://strange-loop-chasing-the-flush.static.hf.space/ | Manual: `npm run deploy:hf` |
+
+`npm run deploy:hf` (`scripts/deploy-hf.mjs`) copies only what the game needs to run (`index.html`, `css/`, `js/`) into a temporary staging folder, adds a Space-specific `README.md` with the Hugging Face frontmatter, commits it on top of the Space's `main` and pushes to the `hf` remote. Add `-- --dry` to stage without pushing. The Space frontmatter lives only in that script, not in this README.
+
+One-time setup: `git remote add hf https://huggingface.co/spaces/Strange-Loop/chasing.the.flush`, and give git a Hugging Face access token with write access to the Space (git will prompt for it once and Git Credential Manager remembers it). Never put the token in a file or on a command line.
+
 ## What v1 leaves out
 
 - One level only: spring. Summer and fall are designed for (see above) but not built.
