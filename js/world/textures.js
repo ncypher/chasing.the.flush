@@ -104,7 +104,7 @@ export function makeBarkTexture(seed = 2) {
   const rng = new RNG(seed * 31 + 5);
   const c = canvas(W, H);
   const g = c.getContext('2d');
-  g.fillStyle = '#9a9488'; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#aaa496'; g.fillRect(0, 0, W, H);
   for (let i = 0; i < 520; i++) {
     const x = rng.range(0, W), y = rng.range(0, H), l = rng.range(30, 160), w = rng.range(1.5, 6);
     const v = rng.int(70, 175);
@@ -195,7 +195,7 @@ export function makeGrassTexture(seed = 5) {
   for (let i = 0; i < 46; i++) {
     const x = rng.range(10, S - 10);
     const h = rng.range(50, S - 8);
-    g.strokeStyle = rng.pick(['#6ea63a', '#80b83f', '#5d9230', '#93c24c']);
+    g.strokeStyle = rng.pick(['#6d8a3e', '#7b9644', '#5f7d36', '#86a04f']);
     g.lineWidth = rng.range(1.4, 3);
     g.beginPath(); g.moveTo(x, S); g.quadraticCurveTo(x + rng.range(-14, 14), S - h * 0.6, x + rng.range(-24, 24), S - h); g.stroke();
   }

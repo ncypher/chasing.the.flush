@@ -62,7 +62,7 @@ const UP = new THREE.Vector3(0, 1, 0);
 
 function jitterColor(hex, rng, amt = 0.1) {
   const c = lin(hex);
-  const k = 1 + rng.range(-amt, amt);
+  const k = 1.25 + rng.range(-amt, amt);
   return [c[0] * k, c[1] * k, c[2] * k];
 }
 

@@ -62,6 +62,7 @@ export async function createEnvironment({ rng, renderer, quality, progress = () 
   group.add(sun, sun.target);
   const hemi = new THREE.HemisphereLight(0xc4dcff, 0x6b5a38, 1.3);
   group.add(hemi);
+  group.add(new THREE.AmbientLight(0xdfe8ff, 0.22));
 
   const sky = createSky({ top: 0x8fb6dc, horizon: fogColor.getHex(), sun: sunDir });
   group.add(sky);
@@ -173,7 +174,7 @@ export async function createEnvironment({ rng, renderer, quality, progress = () 
   }
 
   const barkTex = TX.makeBarkTexture(2);
-  const barkMat = new THREE.MeshStandardMaterial({ map: barkTex, vertexColors: true, roughness: 0.95 });
+  const barkMat = new THREE.MeshStandardMaterial({ map: barkTex, vertexColors: true, roughness: 0.95, emissive: 0x2c281f });
   for (const b of chunks.values()) {
     const m = new THREE.Mesh(b.toGeometry(), barkMat);
     m.castShadow = true; m.receiveShadow = true;
@@ -226,7 +227,7 @@ export async function createEnvironment({ rng, renderer, quality, progress = () 
   };
 
   // logs
-  const logMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, map: barkTex });
+  const logMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, map: barkTex, emissive: 0x15130d });
   let logs = 0;
   for (let i = 0; i < 400 && logs < 16; i++) {
     const a = urng.range(0, Math.PI * 2), d = Math.sqrt(urng.next()) * 64;
@@ -330,7 +331,7 @@ export async function createEnvironment({ rng, renderer, quality, progress = () 
   // orchard grass
   {
     const geo = PL.grassGeometry();
-    const mat = PL.foliageMaterial({ map: TX.makeGrassTexture(5), sway: 0.05, roughness: 0.9 });
+    const mat = PL.foliageMaterial({ map: TX.makeGrassTexture(5), sway: 0.05, roughness: 0.9, glow: 0.45 });
     const n = quality.grass;
     const im = new THREE.InstancedMesh(geo, mat, n);
     let i = 0;
@@ -340,8 +341,8 @@ export async function createEnvironment({ rng, renderer, quality, progress = () 
       const x = ORCH.x + u * c - v * s, z = ORCH.z + u * s + v * c;
       const sd = orchardSDF(x, z);
       if (sd > 3 || (sd > -1 && urng.next() < 0.5) || !onFree(x, z, 0.3)) continue;
-      place(im, i, x, z, urng.range(0.7, 1.4));
-      im.setColorAt(i, tmpC.setRGB(urng.range(0.8, 1.1), urng.range(0.9, 1.15), urng.range(0.7, 1.0)));
+      place(im, i, x, z, urng.range(0.6, 1.2));
+      im.setColorAt(i, tmpC.setRGB(urng.range(0.45, 0.65), urng.range(0.5, 0.68), urng.range(0.35, 0.5)));
       i++;
     }
     im.count = i;

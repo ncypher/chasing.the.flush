@@ -85,8 +85,8 @@ export function fernGeometry(fronds = 7) {
 export function grassGeometry() {
   const parts = [];
   for (let k = 0; k < 3; k++) {
-    const g = new THREE.PlaneGeometry(0.5, 0.42);
-    g.translate(0, 0.21, 0);
+    const g = new THREE.PlaneGeometry(0.3, 0.26);
+    g.translate(0, 0.13, 0);
     g.rotateY((k / 3) * Math.PI);
     const n = g.attributes.normal;
     for (let i = 0; i < n.count; i++) n.setXYZ(i, 0, 1, 0);

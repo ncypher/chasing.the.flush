@@ -56,7 +56,7 @@ export function createSky({ top, horizon, sun }) {
         float t = pow(clamp(h, 0.0, 1.0), 0.55);
         vec3 c = mix(uHorizon, uTop, t);
         float s = max(dot(normalize(vDir), uSunDir), 0.0);
-        c += vec3(1.0, 0.82, 0.5) * (pow(s, 8.0) * 0.35 + pow(s, 64.0) * 0.9) * uGlow;
+        c += vec3(1.0, 0.82, 0.5) * (pow(s, 8.0) * 0.35 + pow(s, 64.0) * 0.9) * uGlow * smoothstep(0.02, 0.4, vDir.y);
         gl_FragColor = vec4(c, 1.0);
       }`,
   });
